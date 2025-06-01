@@ -1,0 +1,28 @@
+stages:
+  - build
+  - deploy
+
+variables:
+  IMAGE: ado-cn-beijing.cr.volces.com/imean-ai/state_e:v$CI_PIPELINE_ID
+
+build:
+  stage: build
+  script:
+    - docker build -t $IMAGE . --push
+
+deploy:
+  stage: deploy
+  image: ado-cn-beijing.cr.volces.com/imean/solar:uniaction
+  variables:
+    YTT_APP_HOST: state.yanshengxing.com
+    YTT_APP_NAME: state
+    YTT_APP_IMAGE: $IMAGE
+    YTT_APP_ID: state
+    YTT_APP_VERSION: $CI_COMMIT_BRANCH
+    YTT_APP_NAMESPACE: ai-poc
+    NOTIFICATION_CONTENT: "🚀 环境地址: [$YTT_APP_HOST](https://$YTT_APP_HOST)"
+  script: |
+    ytt --data-values-env YTT -f devops/prod.yaml | solar deploy --cluster prod --project state_e --env prod --chat_id 2b35c221-1b43-4e09-8c31-cdf5181ee147
+    #solar check --url=https://$YTT_APP_HOST/api/version --chat_id=2b35c221-1b43-4e09-8c31-cdf5181ee147 --expected=v$CI_PIPELINE_ID
+    solar notify --bot 2b35c221-1b43-4e09-8c31-cdf5181ee147
+

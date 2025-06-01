@@ -1,0 +1,76 @@
+#@ load("@ytt:data", "data")
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: #@ data.values.APP_ID
+  namespace: #@ data.values.APP_NAMESPACE
+  labels:
+    app: #@ data.values.APP_NAME
+    version: #@ data.values.APP_VERSION
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: #@ data.values.APP_NAME
+      version: #@ data.values.APP_VERSION
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: #@ data.values.APP_NAME
+        version: #@ data.values.APP_VERSION  
+    spec:
+      restartPolicy: Always
+      imagePullSecrets:
+        - name: image-pull-secret
+      containers:
+        - name: ysx-service-llm
+          image: #@ data.values.APP_IMAGE
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8501
+              name: http
+              protocol: TCP
+---
+
+kind: Service
+apiVersion: v1
+metadata:
+  name: #@ data.values.APP_ID
+  namespace: #@ data.values.APP_NAMESPACE
+spec:
+  ports:
+    - protocol: TCP
+      name: http
+      port: 8501
+      targetPort: 8501
+  selector:
+    app: #@ data.values.APP_NAME
+    version: #@ data.values.APP_VERSION
+  type: ClusterIP
+
+---
+
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: #@ data.values.APP_ID
+  namespace: #@ data.values.APP_NAMESPACE
+  annotations:
+    nginx.ingress.kubernetes.io/service-upstream: 'true'
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: ysx-tls-secret
+  rules:
+    - host: #@ data.values.APP_HOST
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: #@ data.values.APP_ID
+                port:
+                  number: 8501
